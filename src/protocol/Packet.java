@@ -1,6 +1,7 @@
 package protocol;
 
 import java.io.*;
+import java.net.InetAddress;
 import java.net.Socket;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,21 +35,34 @@ import java.util.Map;
  * @param method Somewhat like HTTP, describes what the packet is intended to do (send a message, log in, etc.)
  * @param headers A Map of header names to values.
  * @param content The (possibly empty) message body of the packet.
+ * @param address The IP address of the sender. May be blank in the case of a response packet.
  */
-public record Packet(Method method, Map<String, String> headers, String content) {
+public record Packet(Method method, Map<String, String> headers, String content, InetAddress address) {
     /**
      * Instantiate a packet.
      * @param method The packet method.
      * @param headers The packet headers. The {@code contentLength} header is automatically computed.
      * @param content The body of the packet.
+     * @param address The (possibly blank) IP address of the sender.
      */
-    public Packet(Method method, Map<String, String> headers, String content) {
+    public Packet(Method method, Map<String, String> headers, String content, InetAddress address) {
         var modifiedHeaders = new HashMap<>(headers);
         if (!content.isEmpty())
             modifiedHeaders.put("contentLength", String.valueOf(content.length()));
         this.method = method;
         this.headers = Collections.unmodifiableMap(modifiedHeaders);
         this.content = content;
+        this.address = address;
+    }
+
+    /**
+     * Instantiate a packet without specifying the sender.
+     * @param method The packet method.
+     * @param headers The packet headers. The {@code contentLength} header is automatically computed.
+     * @param content The body of the packet.
+     */
+    public Packet(Method method, Map<String, String> headers, String content) {
+        this(method, headers, content, null);
     }
 
     /**
@@ -67,6 +81,22 @@ public record Packet(Method method, Map<String, String> headers, String content)
      */
     public Packet(Method method, String content) {
         this(method, Map.of(), content);
+    }
+
+    /**
+     * Instantiate a packet with no headers and an empty body
+     * @param method The packet method.
+     */
+    public Packet(Method method) {
+        this(method, "");
+    }
+
+    /**
+     * Instantiate a packet indicating an error.
+     * @param error The particular error
+     */
+    public Packet(Error error) {
+        this(Method.FAILURE, Map.of("error", error.toString()));
     }
 
     /**
@@ -124,6 +154,24 @@ public record Packet(Method method, Map<String, String> headers, String content)
                 throw new PacketMalformedException("Stream ended before we could finish reading packet body.");
             content = String.valueOf(buffer);
         }
-        return new Packet(method, Collections.unmodifiableMap(headers), content);
+        return new Packet(method, Collections.unmodifiableMap(headers), content, socket.getInetAddress());
+    }
+
+    /**
+     * Implement comparison, ignoring address field if either is unspecified.
+     */
+    @Override
+    public boolean equals(Object other) {
+        if (other == null)
+            return false;
+        if (getClass() != other.getClass())
+            return false;
+        var that = (Packet) other;
+        return this.method().equals(that.method())
+                && this.headers().equals(that.headers())
+                && this.content().equals(that.content())
+                // XXX: Is this a good idea?
+                && (this.address() == null || that.address() == null
+                    || this.address().equals(that.address()));
     }
 }

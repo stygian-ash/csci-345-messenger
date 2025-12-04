@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Map;
@@ -99,7 +100,8 @@ class PacketTest {
     @Test
     @DisplayName("Send + Receive packet over TCP")
     void receivePacket() throws IOException {
-        var messagePacket = new Packet(Method.MESSAGE, Map.of("header1", "value1"), "Hello world!");
+        var messagePacket = new Packet(Method.MESSAGE, Map.of("header1", "value1"),
+        "Hello world!", InetAddress.getLoopbackAddress());
         var senderThread = new Thread(() -> {
             try (var socket = new Socket("127.0.0.1", PORT)) {
                 Packet.sendPacket(socket, messagePacket);
@@ -122,7 +124,7 @@ class PacketTest {
         var messagePacket = new Packet(Method.LOGIN, Map.of(
                 "username", "admin",
                 "password", "hunter2"
-        ));
+        ), "", InetAddress.getLocalHost());
         var senderThread = new Thread(() -> {
             try (var socket = new Socket("127.0.0.1", PORT)) {
                 Packet.sendPacket(socket, messagePacket);

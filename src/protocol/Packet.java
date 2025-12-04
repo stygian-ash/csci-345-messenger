@@ -61,6 +61,15 @@ public record Packet(Method method, Map<String, String> headers, String content)
     }
 
     /**
+     * Instantiate a packet with no headers.
+     * @param method The packet method.
+     * @param content The packet body text.
+     */
+    public Packet(Method method, String content) {
+        this(method, Map.of(), content);
+    }
+
+    /**
      * Send a packet over a TCP socket.
      * @param socket The socket to use.
      * @throws IOException if the transfer fails.

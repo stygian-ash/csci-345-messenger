@@ -92,7 +92,8 @@ public class Client {
     }
 
     public static void main(String[] args) throws Exception {
-        Client client = new Client(Integer.parseInt(args[1]), Config.SERVER_IP, Config.SERVER_PORT);
+        Client client = new Client(Integer.parseInt(args.length > 0 ? args[0] : String.valueOf(Config.SERVER_PORT)),
+                Config.SERVER_IP, Config.SERVER_PORT);
         client.runConsole();
     }
 
@@ -102,6 +103,7 @@ public class Client {
         this.serverPort = serverPort;
         this.serverSocket = new ServerSocket(port);
         this.serverThread = new Thread(() -> {
+
             while (true) {
                 try (var connection = serverSocket.accept()) {
                     setStatus(Status.CHATTING);
@@ -210,7 +212,6 @@ public class Client {
 
     public void runConsole() throws IOException {
         BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
-        System.out.println("Client ready. Type 'login <host> <port> <username> <password>' to begin.");
 
         String line;
         while ((line = stdin.readLine()) != null) {
@@ -219,16 +220,22 @@ public class Client {
             String cmd = parts[0].toLowerCase(Locale.ROOT);
 
             switch (cmd) {
-                case "login":
-                    if (parts.length != 5) {
-                        System.out.println("Usage: login <host> <port> <username> <password>");
-                        break;
-                    }
-                    String host = parts[1];
-                    int port = Integer.parseInt(parts[2]);
-                    String user = parts[3];
-                    String pass = parts[4];
-                    throw new UnsupportedOperationException("TODO");
+                case "/server":
+                    serverIP = parts[1];
+                    serverPort = parts.length > 2 ? Integer.parseInt(parts[2]) : Config.SERVER_PORT;
+                    break;
+
+                case "/register": {
+                    String username = parts[1];
+                    String password = parts[2];
+                    register(username, password);
+                } break;
+
+                case "/login": {
+                    String username = parts[1];
+                    String password = parts[2];
+                    login(username, password);
+                } break;
 
                 case "status":
                     if (!isConnected()) { System.out.println("Not connected."); break; }
@@ -239,26 +246,21 @@ public class Client {
                     out.println("STATUS " + parts[1]);
                     break;
 
-                case "msg":
-                    if (!isConnected()) { System.out.println("Not connected."); break; }
-                    if (parts.length < 3) {
-                        System.out.println("Usage: msg <recipient> <message...>");
-                        break;
+                case "/connect":
+                    if (peerSocket != null && !peerSocket.isClosed()) {
+                        destroySession();
                     }
-                    String recipient = parts[1];
-                    String message = line.substring(line.indexOf(recipient) + recipient.length()).trim();
-                    out.println("MSG " + recipient + " " + message);
+                    connectToPeer(parts[1]);
                     break;
 
-                case "sendfile":
-                    if (!isConnected()) { System.out.println("Not connected."); break; }
-                    if (parts.length != 3) {
-                        System.out.println("Usage: sendfile <recipient> <path_to_file>");
-                        break;
+                case "/disconnect":
+                    if (peerSocket != null && !peerSocket.isClosed()) {
+                        destroySession();
                     }
-                    String toUser = parts[1];
-                    Path path = Paths.get(parts[2]);
-                    sendFile(toUser, path);
+                    break;
+
+                case "/sendfile":
+                    // sendFile(parts[1]);
                     break;
 
                 case "quit":
@@ -267,7 +269,7 @@ public class Client {
                     return;
 
                 default:
-                    System.out.println("Unknown command.");
+                    sendMessage(line);
             }
         }
     }

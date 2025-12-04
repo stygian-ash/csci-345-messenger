@@ -51,7 +51,8 @@ class PacketHandlerTest {
         assertAll(
                 () -> assertEquals("admin:hunter2", registerResponse.content()),
                 () -> assertEquals("status=online", statusResponse.content()),
-                () -> assertThrows(IllegalArgumentException.class, () -> server.runRequestHandler(messageRequest))
+                () -> assertThrows(IllegalArgumentException.class,
+                () -> server.runRequestHandler(messageRequest))
         );
     }
 }

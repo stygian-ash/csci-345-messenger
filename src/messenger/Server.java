@@ -54,7 +54,7 @@ public class Server extends PacketHandler {
         while (true) {
             try {
                 listen();
-            } catch (IOException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
                 return;
             }
@@ -102,7 +102,7 @@ public class Server extends PacketHandler {
         if (!userPasswords.containsKey(username))
             return new Packet(Error.NO_SUCH_USER);
         var session = userSessions.get(username);
-        if (session == null || session.status != Status.READY)
+        if (session == null)
             return new Packet(Error.USER_NOT_ONLINE);
         return new Packet(Method.SUCCESS, Map.of(
                 "address", session.address.getHostAddress(),

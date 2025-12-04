@@ -28,6 +28,7 @@ public class Client {
     public Thread incomingThread = null;
     public ServerSocket serverSocket;
     public Thread serverThread;
+    public String peerName = null;
 
     private static class IncomingPacketHandler extends PacketHandler implements Runnable {
         private Socket socket;
@@ -39,25 +40,27 @@ public class Client {
         @Override
         public void run() {
             while (!socket.isClosed()) {
-                Packet response = null;
                 try {
-                    var request = Packet.readPacket(socket);
-                    response = switch (request.method()) {
-                        case HELLO ->  handleHELLO(request);
-                        case MESSAGE ->  handleMESSAGE(request);
-                        case GOODBYE ->  handlesGOODBYE(request);
-                        case FILE ->  handleFILE(request);
-                        default -> new Packet(Error.UNSUPPORTED_METHOD);
-                    };
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                    Packet response = null;
+                    try {
+                        var request = Packet.readPacket(socket);
+                        response = switch (request.method()) {
+                            case HELLO -> handleHELLO(request);
+                            case MESSAGE -> handleMESSAGE(request);
+                            case GOODBYE -> handlesGOODBYE(request);
+                            case FILE -> handleFILE(request);
+                            default -> new Packet(Error.UNSUPPORTED_METHOD);
+                        };
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
 
-                try {
-                    Packet.sendPacket(socket, response);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                    try {
+                        Packet.sendPacket(socket, response);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } catch (Exception e) {}
             }
         }
 
@@ -68,7 +71,7 @@ public class Client {
 
         @HandlesMethod(Method.MESSAGE)
         public Packet handleMESSAGE(Packet message) {
-            IO.println(message.content());
+            IO.println(">" + message.content());
             return new Packet(Method.SUCCESS);
         }
 
@@ -183,17 +186,27 @@ public class Client {
         return response.getError();
     }
 
-    public void connectToPeer(String username) throws IOException {
+    public Socket connectToPeer(String username) throws IOException {
         var peer = whois(username);
-        if (peer == null || peer.status() != Status.READY)
-            return;
+        if (peer == null) {
+            IO.println("Invalid user!");
+            return null;
+        }
+        if (peer.status() != Status.READY) {
+            IO.println("User is busy!");
+            // return null;
+        }
+        peerName = username;
         setStatus(Status.CHATTING);
         peerSocket = new Socket(peer.address(), peer.port());
         incomingThread = new Thread(new IncomingPacketHandler(peerSocket));
         incomingThread.start();
+        return peerSocket;
     }
 
    public Error sendMessage(String message) throws IOException {
+        if (peerSocket == null)
+            return Error.MALFORMED_REQUEST;
         var packet = new Packet(Method.MESSAGE, message);
         Packet.sendPacket(peerSocket, packet);
         var response = Packet.readPacket(peerSocket);
@@ -203,7 +216,6 @@ public class Client {
     public synchronized void destroySession() throws IOException {
         if (!peerSocket.isClosed()) {
             Packet.sendPacket(peerSocket, new Packet(Method.GOODBYE));
-            var response = Packet.readPacket(socket);
             peerSocket.close();
         }
         incomingThread = null;
@@ -211,66 +223,68 @@ public class Client {
     }
 
     public void runConsole() throws IOException {
-        BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
+        try {
+            BufferedReader stdin = new BufferedReader(new InputStreamReader(System.in));
 
-        String line;
-        while ((line = stdin.readLine()) != null) {
-            if (line.trim().isEmpty()) continue;
-            String[] parts = line.trim().split("\\s+");
-            String cmd = parts[0].toLowerCase(Locale.ROOT);
+            String line;
+            while ((line = stdin.readLine()) != null) {
+                if (line.trim().isEmpty()) continue;
+                String[] parts = line.trim().split("\\s+");
+                String cmd = parts[0].toLowerCase(Locale.ROOT);
 
-            switch (cmd) {
-                case "/server":
-                    serverIP = parts[1];
-                    serverPort = parts.length > 2 ? Integer.parseInt(parts[2]) : Config.SERVER_PORT;
-                    break;
-
-                case "/register": {
-                    String username = parts[1];
-                    String password = parts[2];
-                    register(username, password);
-                } break;
-
-                case "/login": {
-                    String username = parts[1];
-                    String password = parts[2];
-                    login(username, password);
-                } break;
-
-                case "status":
-                    if (!isConnected()) { System.out.println("Not connected."); break; }
-                    if (parts.length != 2) {
-                        System.out.println("Usage: status <Online|Away|Busy|Offline>");
+                switch (cmd) {
+                    case "/server":
+                        serverIP = parts[1];
+                        serverPort = parts.length > 2 ? Integer.parseInt(parts[2]) : Config.SERVER_PORT;
                         break;
-                    }
-                    out.println("STATUS " + parts[1]);
-                    break;
 
-                case "/connect":
-                    if (peerSocket != null && !peerSocket.isClosed()) {
-                        destroySession();
-                    }
-                    connectToPeer(parts[1]);
-                    break;
-
-                case "/disconnect":
-                    if (peerSocket != null && !peerSocket.isClosed()) {
-                        destroySession();
+                    case "/register": {
+                        String username = parts[1];
+                        String password = parts[2];
+                        register(username, password);
                     }
                     break;
 
-                case "/sendfile":
-                    // sendFile(parts[1]);
+                    case "/login": {
+                        String username = parts[1];
+                        String password = parts[2];
+                        login(username, password);
+                    }
                     break;
 
-                case "quit":
-                    close();
-                    System.out.println("Bye.");
-                    return;
+                    case "/getstatus":
+                        var peer = whois(parts[1]);
+                        System.out.printf("User %s: %s\n", peer.username(), peer.status());
+                        break;
 
-                default:
-                    sendMessage(line);
+                    case "/connect":
+                        if (peerSocket != null && !peerSocket.isClosed()) {
+                            destroySession();
+                        }
+                        connectToPeer(parts[1]);
+                        break;
+
+                    case "/disconnect":
+                        if (peerSocket != null && !peerSocket.isClosed()) {
+                            destroySession();
+                        }
+                        break;
+
+                    case "/sendfile":
+                        sendFile(parts[1], parts[2]);
+                        break;
+
+                    case "quit":
+                        close();
+                        System.out.println("Bye.");
+                        return;
+
+                    default:
+                        sendMessage(line);
+                }
             }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -330,31 +344,28 @@ public class Client {
         }
     }
 
-    public void sendFile(String recipient, Path path) {
+    public void sendFile(String path, String filename) {
+        String contents;
+        try (var reader = new BufferedReader(new FileReader(path))) {
+            contents = reader.readAllAsString();
+        } catch (FileNotFoundException ex) {
+            IO.println("File not found!");
+            return;
+        } catch (IOException ex) {
+            IO.println("An error has occurred!");
+            return;
+        }
+        var request = new Packet(Method.FILE, Map.of(
+                "filename", filename
+        ), contents);
         try {
-            if (!Files.exists(path)) {
-                System.out.println("File not found: " + path);
-                return;
-            }
-            long size = Files.size(path);
-            String filename = path.getFileName().toString();
-            // Send header
-            out.println("FILE " + recipient + " " + filename + " " + size);
-
-            // Send bytes
-            try (InputStream fis = Files.newInputStream(path)) {
-                byte[] buf = new byte[8192];
-                long remaining = size;
-                while (remaining > 0) {
-                    int read = fis.read(buf, 0, (int)Math.min(buf.length, remaining));
-                    if (read == -1) throw new EOFException("Unexpected EOF");
-                    rawOut.write(buf, 0, read);
-                    remaining -= read;
-                }
-                rawOut.flush();
-            }
+            Packet.sendPacket(peerSocket, request);
+            var response = Packet.readPacket(peerSocket);
+            // if (response.method() != Method.SUCCESS && response.getError() != Error.OK)
+            //     throw new IOException();
+            IO.println("File sent successfully!");
         } catch (IOException e) {
-            System.out.println("sendFile error: " + e.getMessage());
+            IO.println("Failed to send file! Network error.");
         }
     }
 

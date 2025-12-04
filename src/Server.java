@@ -146,10 +146,15 @@ public class Server {
                 return;
             }
             String newStatus = parts[1];
-            ONLINE.get(username).status = newStatus;
-            session.sendLine("STATUS_OK");
-            broadcastPresence();
-            System.out.println("Status update: " + username + " -> " + newStatus);
+            // Only updates status if user is in ONLINE map
+            if (ONLINE.containsKey(username)) {
+                ONLINE.get(username).status = newStatus;
+                session.sendLine("STATUS OK");
+                broadcastPresence();
+                System.out.println("Status update: " + username + " ->" + newStatus);
+            } else {
+                session.sendLine("ERROR Not Logged In.");
+            }
         }
 
         private void handleMsg(String[] parts, String rawLine) {
@@ -195,14 +200,26 @@ public class Server {
                 return;
             }
 
-            // Notify recipient and relay bytes
+            // Notify recipient and sender before relaying bytes
             dest.sendLine("FILE_FROM " + username + " " + filename + " " + size);
             session.sendLine("FILE_OK Sending");
 
-            relayBytes(session.rawIn, dest.rawOut, size);
+            boolean success = false;
+            // Notifies original sender if a transfer failed
+            try {
+                relayBytes(session.rawIn, dest.rawOut, size);
+                success = true;
+                session.sendLine("FILE_SENT " + recipient + " " + filename);
+            } catch (IOException e) {
+                // Notify original sender that the relay failed
+                session.sendLine("ERROR FILE_TRANSFER_FAILED to " + recipient);
+                // Log the error on the server side
+                System.err.println("File relay failed: " + e.getMessage());
+            }
 
-            session.sendLine("FILE_SENT " + recipient + " " + filename);
-            System.out.println("File " + filename + " (" + size + " bytes) relayed " + username + " -> " + recipient);
+            if (success) {
+                System.out.println("File " + filename + " (" + size + " bytes) successfully relayed " + username + " -> " + recipient);
+            }
         }
 
         private void relayBytes(InputStream in, OutputStream out, long size) throws IOException {

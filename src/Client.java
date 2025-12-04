@@ -139,6 +139,9 @@ public class Client {
                     System.out.println("File received from " + sender + ": " + savePath.toAbsolutePath());
                 } else if (line.startsWith("PRESENCE ")) {
                     System.out.println("Online: " + line.substring("PRESENCE ".length()));
+                } else if (line.startsWith("ERROR FILE_TRANSFER_FAILED ")){
+                    // Handling the new file failure message from the server
+                    System.err.println("The server failed to relay the file. Recipient may have been disconnected");
                 } else if (line.startsWith("ERROR ")) {
                     System.out.println("Server error: " + line.substring("ERROR ".length()));
                 } else if (line.startsWith("STATUS_OK")) {
@@ -154,8 +157,13 @@ public class Client {
                     System.out.println(line);
                 }
             }
+        } catch(SocketException e) {
+            // Log message if server shuts down or connection is broken
+            System.out.println("Disconnected from server: " + e.getMessage());
         } catch (IOException e) {
-            System.out.println("Disconnected: " + e.getMessage());
+            System.out.println("Disconnected (I/O Errror): " + e.getMessage());
+        } catch (NumberFormatException e) {
+            System.err.println("Protocol Error: Received invalid number (e.g., file size)" );
         } finally {
             close();
         }

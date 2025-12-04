@@ -1,6 +1,7 @@
 package protocol;
 
 public enum Error {
+    OK,
     MALFORMED_REQUEST,
     UNSUPPORTED_METHOD,
     WRONG_CREDENTIALS,

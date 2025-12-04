@@ -88,7 +88,7 @@ class ServerTest {
         var response = server.onRequestWHOIS(request);
         var target = new Packet(Method.SUCCESS,
                 Map.of(
-                        "address", InetAddress.getLoopbackAddress().toString(),
+                        "address", InetAddress.getLoopbackAddress().getHostAddress(),
                         "port", String.valueOf(USER_PORT),
                         "status", "ONLINE"
                 ), "", InetAddress.getLoopbackAddress()

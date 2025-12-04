@@ -1,11 +1,19 @@
 package messenger;
 
+import protocol.Error;
+import protocol.Method;
+import protocol.Packet;
+
 import java.io.*;
 import java.net.*;
 import java.nio.file.*;
 import java.util.Locale;
+import java.util.Map;
 
 public class Client {
+    private int port;
+    private String serverIP;
+    private int serverPort;
     private Socket socket;
     private BufferedReader in;
     private PrintWriter out;
@@ -14,8 +22,59 @@ public class Client {
     private Thread readerThread;
 
     public static void main(String[] args) throws Exception {
-        Client client = new Client();
+        Client client = new Client(Integer.parseInt(args[1]), Config.SERVER_IP, Config.SERVER_PORT);
         client.runConsole();
+    }
+
+    public Client(int port, String serverIP, int serverPort) {
+        this.port = port;
+        this.serverIP = serverIP;
+        this.serverPort = serverPort;
+    }
+
+    public Packet makeServerRequest(Packet request) throws IOException {
+        try (var socket = new Socket(serverIP, serverPort)) {
+            Packet.sendPacket(socket, request);
+            return Packet.readPacket(socket);
+        }
+    }
+
+    public Error register(String username, String password) throws IOException {
+        var request = new Packet(Method.REGISTER,
+                Map.of(
+                        "username", username,
+                        "password", password,
+                        "listenPort", String.valueOf(port)
+                )
+        );
+
+        var response = makeServerRequest(request);
+        return response.getError();
+    }
+
+    public Error login(String username, String password) throws IOException {
+        var request = new Packet(Method.LOGIN,
+                Map.of(
+                        "username", username,
+                        "password", password,
+                        "listenPort", String.valueOf(port)
+                )
+        );
+
+        var response = makeServerRequest(request);
+        return response.getError();
+    }
+
+    public Peer whois(String username) throws IOException {
+        var request = new Packet(Method.WHOIS, Map.of("username", username));
+        var response = makeServerRequest(request);
+        if (response.method() != Method.SUCCESS)
+            return null;
+        return new Peer(
+                username,
+                InetAddress.getByName(response.headers().get("address")),
+                Integer.parseInt(response.headers().get("port"))
+        );
     }
 
     public void runConsole() throws IOException {
@@ -38,8 +97,7 @@ public class Client {
                     int port = Integer.parseInt(parts[2]);
                     String user = parts[3];
                     String pass = parts[4];
-                    doLogin(host, port, user, pass);
-                    break;
+                    throw new UnsupportedOperationException("TODO");
 
                 case "status":
                     if (!isConnected()) { System.out.println("Not connected."); break; }
@@ -80,37 +138,6 @@ public class Client {
                 default:
                     System.out.println("Unknown command.");
             }
-        }
-    }
-
-    public void doLogin(String host, int port, String username, String password) {
-        try {
-            close(); // ensure clean state
-            socket = new Socket(host, port);
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            out = new PrintWriter(new OutputStreamWriter(socket.getOutputStream()), true);
-            rawIn = socket.getInputStream();
-            rawOut = socket.getOutputStream();
-
-            // Send AUTH
-            out.println("AUTH " + username + " " + password);
-
-            // Read response
-            String resp = in.readLine();
-            if (resp == null || !resp.startsWith("AUTH_OK")) {
-                System.out.println("Login failed: " + (resp == null ? "no response" : resp));
-                close();
-                return;
-            }
-            System.out.println("Logged in as " + username);
-
-            // Start reader thread for events
-            readerThread = new Thread(this::readerLoop, "ServerReader");
-            readerThread.setDaemon(true);
-            readerThread.start();
-        } catch (IOException e) {
-            System.out.println("Login error: " + e.getMessage());
-            close();
         }
     }
 

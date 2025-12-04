@@ -99,6 +99,14 @@ public record Packet(Method method, Map<String, String> headers, String content,
         this(Method.FAILURE, Map.of("error", error.toString()));
     }
 
+    public Error getError() {
+        return switch (method()) {
+            case SUCCESS -> Error.OK;
+            case FAILURE -> Error.valueOf(headers().get("error"));
+            default -> throw new UnsupportedOperationException("Request methods have no error field.");
+        };
+    }
+
     /**
      * Send a packet over a TCP socket.
      * @param socket The socket to use.

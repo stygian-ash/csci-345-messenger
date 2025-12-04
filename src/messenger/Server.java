@@ -36,7 +36,9 @@ public class Server extends PacketHandler {
 
     public void listen() throws IOException {
         try (var connection = socket.accept()) {
+            IO.println("Received connection from %s:%d".formatted(connection.getInetAddress(), connection.getPort()));
             var request = Packet.readPacket(connection);
+            IO.println("\t" + request);
             Packet response;
             try {
                 response = this.runRequestHandler(request);
@@ -48,6 +50,7 @@ public class Server extends PacketHandler {
     }
 
     public void listenLoop() {
+        IO.println("Listening on port %d".formatted(port));
         while (true) {
             try {
                 listen();
@@ -102,7 +105,7 @@ public class Server extends PacketHandler {
         if (session == null || session.status == Status.OFFLINE)
             return new Packet(Error.USER_NOT_ONLINE);
         return new Packet(Method.SUCCESS, Map.of(
-                "address", session.address.toString(),
+                "address", session.address.getHostAddress(),
                 "port", String.valueOf(session.port),
                 "status", session.status.toString()
         ));

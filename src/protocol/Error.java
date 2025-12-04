@@ -1,0 +1,10 @@
+package protocol;
+
+public enum Error {
+    MALFORMED_REQUEST,
+    UNSUPPORTED_METHOD,
+    WRONG_CREDENTIALS,
+    USER_ALREADY_EXISTS,
+    NO_SUCH_USER,
+    USER_NOT_ONLINE
+}

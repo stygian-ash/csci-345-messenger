@@ -36,6 +36,15 @@ class PacketTest {
     }
 
     @Test
+    void createErrorPacket() {
+        var packet = new Packet(Error.WRONG_CREDENTIALS);
+        var target = new Packet(Method.FAILURE,
+                Map.of("error", "WRONG_CREDENTIALS")
+        );
+        assertEquals(target, packet);
+    }
+
+    @Test
     @DisplayName("Send packet over TCP")
     void sendPacket() throws IOException {
         var messagePacket = new Packet(Method.MESSAGE, Map.of("header1", "value1"), "Hello world!");

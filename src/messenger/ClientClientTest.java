@@ -42,12 +42,13 @@ class ClientClientTest {
     @Test
     @Order(1)
     void testMessage() throws IOException {
-        // client.connectToPeer("bob");
-        // client.sendMessage("The quick");
-        // client.sendMessage("brown fox");
-        // client.sendMessage("jumps over");
-        // client.sendMessage("the lazy");
-        // client.sendMessage("dogs!!");
-        // peer.sendMessage("Neat!");
+        var peerInfo = client.whois("bob");
+        assertEquals(
+                new Peer("bob", InetAddress.getLoopbackAddress(), PEER_PORT, Status.READY), peerInfo
+        );
+        assertNotNull(client.connectToPeer("bob"));
+        client.sendMessage("Hi bob!");
+        peer.sendMessage("Hi alice!");
+        client.sendFile("src/messenger/Client.java", "/dev/null");
     }
 }

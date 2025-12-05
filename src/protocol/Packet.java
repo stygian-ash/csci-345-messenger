@@ -15,7 +15,7 @@ import java.util.Map;
  * <pre>
  *     FILE\n
  *     contentLength: 12\n
- *     fileName: hello.txt\n
+ *     filename: hello.txt\n
  *     \n
  *     Hello world!
  * </pre>

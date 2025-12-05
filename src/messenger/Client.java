@@ -227,54 +227,43 @@ public class Client {
                 String cmd = parts[0].toLowerCase(Locale.ROOT);
 
                 switch (cmd) {
-                    case "/server":
+                    case "/server": {
                         serverIP = parts[1];
                         serverPort = parts.length > 2 ? Integer.parseInt(parts[2]) : Config.SERVER_PORT;
-                        break;
-
+                    } break;
                     case "/register": {
                         String username = parts[1];
                         String password = parts[2];
                         register(username, password);
-                    }
-                    break;
-
+                    } break;
                     case "/login": {
                         String username = parts[1];
                         String password = parts[2];
                         login(username, password);
-                    }
-                    break;
-
-                    case "/getstatus":
+                    } break;
+                    case "/getstatus": {
                         var peer = whois(parts[1]);
                         System.out.printf("User %s: %s\n", peer.username(), peer.status());
-                        break;
-
-                    case "/connect":
+                    } break;
+                    case "/connect": {
                         if (peerSocket != null && !peerSocket.isClosed()) {
                             destroySession();
                         }
                         connectToPeer(parts[1]);
-                        break;
-
-                    case "/disconnect":
+                    } break;
+                    case "/disconnect": {
                         if (peerSocket != null && !peerSocket.isClosed()) {
                             destroySession();
                         }
-                        break;
-
-                    case "/sendfile":
+                    } break;
+                    case "/sendfile": {
                         sendFile(parts[1], parts[2]);
-                        break;
-
-                    case "quit":
+                    } break;
+                    case "/quit": {
                         close();
                         System.out.println("Bye.");
-                        return;
-
-                    default:
-                        sendMessage(line);
+                    } return;
+                    default: sendMessage(line);
                 }
             }
         } catch (Exception e) {
